@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import threading
 import serial
-from functools import reduce
+import time
 #****************************************************************************************************#
 # 初始化摄像头
 def init_camera():
@@ -26,6 +26,10 @@ def detect_color(stop_event, min_area, lower_bounds, upper_bounds, color_id):
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         combined_mask = cv2.inRange(hsv_frame, lower_bounds, upper_bounds)
         contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        #初始化变量，用于输出000
+        found_contour=False
+
         if contours:
             for contour in contours:
                 area = cv2.contourArea(contour)
@@ -34,13 +38,14 @@ def detect_color(stop_event, min_area, lower_bounds, upper_bounds, color_id):
                     circle_x = int(x + w / 2)
                     circle_y = int(y + h / 2)
                     datatransfrom(color_id, circle_x, circle_y)
+                    found_contour=True
                     break
-        else:
+        if not found_contour:
             datatransfrom(0, 640, 360)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 #****************************************************************************************************#
-# 颜色检测函数
+# 红色专属检测函数
 def detect_color_red(stop_event, min_area, lower_bounds, upper_bounds, color_id):
     global camera
     while not stop_event.is_set():
@@ -53,7 +58,12 @@ def detect_color_red(stop_event, min_area, lower_bounds, upper_bounds, color_id)
         mask_1=cv2.inRange(hsv_frame,np.array([139, 76, 76]), np.array([180, 255, 255]))
         combined_mask=cv2.bitwise_or(mask_0,mask_1)
         contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        #初始化变量，用于输出000
+        found_contour=False
+
         if contours:
+            print(contours)
             for contour in contours:
                 area = cv2.contourArea(contour)
                 if area > min_area:
@@ -61,9 +71,10 @@ def detect_color_red(stop_event, min_area, lower_bounds, upper_bounds, color_id)
                     circle_x = int(x + w / 2)
                     circle_y = int(y + h / 2)
                     datatransfrom(color_id, circle_x, circle_y)
+                    found_contour=True
                     break
-        else:
-            datatransfrom(0, 640, 360)
+        if not found_contour:
+            datatransfrom(0,640,360)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 #****************************************************************************************************#
@@ -94,7 +105,7 @@ def detect_circle(stop_event, min_area, lower_bounds, upper_bounds, color_id):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 #****************************************************************************************************#
-# 圆形检测函数
+# 红色圆环专属检测函数
 def detect_circle_red(stop_event, min_area, lower_bounds, upper_bounds, color_id):
     global camera
     while not stop_event.is_set():
@@ -123,6 +134,46 @@ def detect_circle_red(stop_event, min_area, lower_bounds, upper_bounds, color_id
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 #****************************************************************************************************#
+def Det_all(stop_event,min_area):
+    global camera
+    while not stop_event.is_set():
+        ret,img=camera.read()
+        if not ret:
+            continue
+        frame=img.copy()
+        hsv_frame =cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
+        #****************************************************************************************************#
+        #red块 
+        all_red_mask1 = cv2.inRange(hsv_frame,np.array([0, 95, 132]), np.array([37, 255, 255]))
+        all_red_mask2 = cv2.inRange(hsv_frame,np.array([139, 76, 76]), np.array([180, 255, 255]))
+        all_red_mask =cv2.bitwise_or(all_red_mask1,all_red_mask2)
+        contours_all_red, _ = cv2.findContours(all_red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #****************************************************************************************************#
+        #green块 
+        all_green_mask =cv2.inRange(hsv_frame,np.array([35, 52, 99]), np.array([93, 255, 255]))
+        contours_all_green, _ = cv2.findContours(all_green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #****************************************************************************************************#
+        #blue块 
+        all_blue_mask =cv2.inRange(hsv_frame,np.array([95, 70, 64]), np.array([154, 255, 255]))
+        contours_all_blue, _ = cv2.findContours(all_blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #初始化变量，用于输出000
+        found_contour=False
+
+        det_for(contours_all_red,min_area,1,found_contour)
+        det_for(contours_all_green,min_area,2,found_contour)
+        det_for(contours_all_blue,min_area,3,found_contour)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+#****************************************************************************************************#
+def Donothing(stop_event):
+    while not stop_event.is_set():
+        print("Do Nothing")
+        datatransfrom(8,640,360)
+        time.sleep(1)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+#****************************************************************************************************#
 # 数据标准化转化传输函数
 def datatransfrom(exist, x_o, y_o):
     x = x_o - 640
@@ -136,6 +187,21 @@ def datatransfrom(exist, x_o, y_o):
     center_y_byte = y.to_bytes(2, byteorder='big', signed=True)
     data = b"".join([data_head_byte, exist_byte, center_x_byte, center_y_byte, data_end_byte])
     listener.ser.write(data)
+#****************************************************************************************************#
+# 物块防止台检测判断函数
+def det_for(contours,min_area,color_id,found_contour):
+    if contours:
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if area > min_area:
+                    x, y, w, h = cv2.boundingRect(contour)
+                    circle_x = int(x + w / 2)
+                    circle_y = int(y + h / 2)
+                    datatransfrom(color_id, circle_x, circle_y)
+                    found_contour=True
+                    break
+    if not found_contour:
+            datatransfrom(0, 640, 360)
 #****************************************************************************************************#
 # 串口线程管理类
 class SerialListener(threading.Thread):
@@ -162,19 +228,19 @@ class SerialListener(threading.Thread):
         print(f"开始监听 {self.port}...")
         while not self.stop_event.is_set():
             if self.ser.in_waiting > 0:
-                data_o = self.ser.read().decode("utf-8").strip()
+                data_o = self.ser.read(self.ser.in_waiting)
                 # 将每个字节转换为对应的字符
                 char_list = []
                 for byte in data_o:
-                    if 1 <= byte <= 6:
-                        char = chr(ord('1') + (byte - 1))  # 将字节值转换为字符 '1' 到 '6'
+                    if 1 <= byte <= 8:
+                        char = chr(ord('1') + (byte - 1))  # 将字节值转换为字符 '1' 到 '8'
                         char_list.append(char)
                     else:
                         char_list.append('?')  # 处理无效字节
 
                 data = ''.join(char_list)
                 print(f"转换后的字符信息: {data}")
-                if data in ["1", "2", "3", "4", "5", "6"]:
+                if data in ["1", "2", "3", "4", "5", "6","7","8"]:
                     self.task = data
 
     def stop(self):
@@ -193,7 +259,7 @@ if __name__ == "__main__":
         print("摄像头未正常打开")
     
     # 创建并启动串口监听线程
-    listener = SerialListener(port="/dev/ttyS0")  # 根据实际情况修改端口号
+    listener = SerialListener(port="COM7")  # 根据实际情况修改端口号
     listener.start()
     
     # 初始化线程任务变量
@@ -236,7 +302,15 @@ if __name__ == "__main__":
                     thread = threading.Thread(target=detect_circle, args=(stop_event, 200, np.array([95, 70, 64]), np.array([154, 255, 255]), 6))
                     image_threads.append(thread)
                     thread.start()
-            
+                elif current_task == "7":
+                    thread = threading.Thread(target=Det_all, args=(stop_event, 100*100,))
+                    image_threads.append(thread)
+                    thread.start()
+                elif current_task == "8":
+                    thread = threading.Thread(target=Donothing, args=(stop_event,))
+                    image_threads.append(thread)
+                    thread.start()
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     
