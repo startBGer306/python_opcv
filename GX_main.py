@@ -160,7 +160,9 @@ def Det_all(stop_event,min_area):
         found_contour=False
 
         det_for(contours_all_red,min_area,1,found_contour)
+        time.sleep(0.005)
         det_for(contours_all_green,min_area,2,found_contour)
+        time.sleep(0.005)
         det_for(contours_all_blue,min_area,3,found_contour)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
