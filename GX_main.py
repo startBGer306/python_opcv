@@ -158,12 +158,15 @@ def Det_all(stop_event,min_area):
         contours_all_blue, _ = cv2.findContours(all_blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         #初始化变量，用于输出000
         found_contour=False
-
         det_for(contours_all_red,min_area,1,found_contour)
         time.sleep(0.005)
+
         det_for(contours_all_green,min_area,2,found_contour)
         time.sleep(0.005)
+
         det_for(contours_all_blue,min_area,3,found_contour)
+        if(det_for(contours_all_red,min_area,1,found_contour) | det_for(contours_all_green,min_area,2,found_contour) | det_for(contours_all_blue,min_area,3,found_contour)) == False :
+            datatransfrom(0, 640, 360)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
@@ -191,7 +194,7 @@ def datatransfrom(exist, x_o, y_o):
     listener.ser.write(data)
 #****************************************************************************************************#
 # 物块防止台检测判断函数
-def det_for(contours,min_area,color_id,found_contour):
+def det_for(contours,min_area,color_id,found_contour_):
     if contours:
             for contour in contours:
                 area = cv2.contourArea(contour)
@@ -200,10 +203,11 @@ def det_for(contours,min_area,color_id,found_contour):
                     circle_x = int(x + w / 2)
                     circle_y = int(y + h / 2)
                     datatransfrom(color_id, circle_x, circle_y)
-                    found_contour=True
+                    found_contour_=True
+                    return 1
                     break
-    if not found_contour:
-            datatransfrom(0, 640, 360)
+    if not found_contour_:
+        return 0
 #****************************************************************************************************#
 # 串口线程管理类
 class SerialListener(threading.Thread):
